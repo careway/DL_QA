@@ -3,7 +3,14 @@ This is for the first push
 
 
 //Structure
+
 	Main.py
+	
+	
 	model.py
+	
+	
 	data.py
+	
+	
 	debug.ipnb

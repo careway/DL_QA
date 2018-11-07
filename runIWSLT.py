@@ -32,7 +32,7 @@ trainItNb = 10
 BATCH_SIZE = 12000
 validFreq = 5
 previousEpochNb = 0
-modelSavePath = ".Model/modelIWSLT.nn"
+modelSavePath = "Model/modelIWSLT.nn"
 
 class MyIterator(data.Iterator):
     def create_batches(self):
@@ -146,11 +146,20 @@ def saveModel(model, epoch, optimizer, batchSize, PATH):
     }
     torch.save(state, PATH)
 
-def loadModel(PATH):
+def loadModel(PATH, SRC, TGT):
     state = torch.load(PATH)
+    
+    model = transformer.make_model(len(SRC.vocab), len(TGT.vocab))
     model.load_state_dict(state['state_dict'])
-    optimizer.load_state_dict(state['optimizer'])
+    
+    optimizer = transformer.NoamOpt(model.src_embed[0].d_model, 1, 2000,
+            torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))   
+    optimizer.load_state_dict(state['optimizer']) 
+    
+    batchSize = 0
     batchSize.load_state_dict(state['batchSize'])
+    
+    epoch = 0
     epoch.load_state_dict(state['epoch'])
 
     return model,optimizer,batchSize,epoch
@@ -166,7 +175,7 @@ print("Data Loaded")
 
 if (loadPreTrain or justEvaluate) :
     print("Loading pre-trained network")
-    model, model_opt, BATCH_SIZE, previousEpochNb = loadModel(modelSavePath)
+    model, model_opt, BATCH_SIZE, previousEpochNb = loadModel(modelSavePath, SRC, TGT)
 else :
     print("initializing network")
     model = transformer.make_model(len(SRC.vocab), len(TGT.vocab), N=6)

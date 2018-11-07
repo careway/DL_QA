@@ -11,10 +11,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math, copy, time
 from torch.autograd import Variable
+from torchtext import data, datasets
 
-import transformer.py 
-import transformerTraining.py
-import dataLoaderIWSLT.py
+import transformer
+import dataLoaderIWLST 
 
 ##visualization thingy
 #import matplotlib.pyplot as plt
@@ -54,7 +54,7 @@ class MyIterator(data.Iterator):
         def rebatch(pad_idx, batch):
             "Fix order in torchtext to match ours"
             src, trg = batch.src.transpose(0, 1), batch.trg.transpose(0, 1)
-            return Batch(src, trg, pad_idx)
+            return transformer.Batch(src, trg, pad_idx)
 
 class MultiGPULossCompute:
     "A multi-gpu loss compute and train function."
@@ -120,7 +120,7 @@ def training(model, optimizer, trainItNb, train_iter, valid_iter, validFreq, cri
         model.train()
         #run_epoch computes the loss given the input optimizer function, which is here MultiGPULossCompute
         #if the argument optimizer of MultiGPULossCompute isn't none then it will also perform the backprop
-        run_epoch((rebatch(pad_idx, b) for b in train_iter), 
+        transformer.run_epoch((rebatch(pad_idx, b) for b in train_iter), 
                   model, 
                   MultiGPULossCompute(model.generator, criterion, 
                                       devices=devices, opt=optimizer))
@@ -130,11 +130,11 @@ def training(model, optimizer, trainItNb, train_iter, valid_iter, validFreq, cri
 
 def evaluate(model, valid_iter, criterion, devices, optimizer, pad_idx) :
     model.eval()
-    loss = run_epoch((rebatch(pad_idx, b) for b in valid_iter), 
+    loss = transformer.run_epoch((rebatch(pad_idx, b) for b in valid_iter), 
                      model, 
                      MultiGPULossCompute(model.generator, criterion, 
                      devices=devices, opt=None))
-    print(loss)
+    print("loss : ", loss)
 
 def saveModel(model, epoch, optimizer, batchSize, PATH):
     state = {
@@ -153,21 +153,30 @@ def loadModel(PATH):
     epoch.load_state_dict(state['epoch'])
 
     return model,optimizer,batchSize,epoch
+########################################################
+#run code starts here
+########################################################
+
     
 #Load Data
-SRC,TGT,train,val,test, pad_idx = loadDataIWLST()
+print("Loading Data")
+SRC,TGT,train,val,test, pad_idx = dataLoaderIWLST.loadDataIWLST()
+print("Data Loaded")
 
 if (loadModel | justEvaluate) :
+    print("Loading pre-trained network")
     model, model_opt, BATCH_SIZE, previousEpochNb = loadModel(modelSavePath)
 else :
-    model = make_model(len(SRC.vocab), len(TGT.vocab), N=6)
-    model_opt = NoamOpt(model.src_embed[0].d_model, 1, 2000,
+    print("initializing network")
+    model = transformer.make_model(len(SRC.vocab), len(TGT.vocab), N=6)
+    model_opt = transformer.NoamOpt(model.src_embed[0].d_model, 1, 2000,
             torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
 
 model.cuda()
-criterion = LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
+criterion = transformer.LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
 criterion.cuda()
 
+print("initializing iterators")
 train_iter = MyIterator(train, batch_size=BATCH_SIZE, device=0,
                         repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
                         batch_size_fn=batch_size_fn, train=True)
@@ -179,8 +188,11 @@ valid_iter = MyIterator(val, batch_size=BATCH_SIZE, device=0,
 model_par = nn.DataParallel(model, device_ids=devices)
 
 if not (justEvaluate) :
+    print("Starting training")
     training(model_par, model_opt, trainItNb, train_iter, valid_iter, validFreq, criterion, pad_idx)
     evaluate(model_par, valid_iter, criterion, devices, model_opt, pad_idx)
+
+    print("Saving network")
     saveModel(model_par, previousEpochNb + trainItNb, model_opt, BATCH_SIZE, modelSavePath)
 else :
     evaluate(model_par, valid_iter, criterion, devices, model_opt, pad_idx)

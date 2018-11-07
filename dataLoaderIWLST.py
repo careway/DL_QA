@@ -1,9 +1,6 @@
 from torchtext import data, datasets
 import spacy
 
-spacy_fr = spacy.load('fr')
-spacy_en = spacy.load('en')
-
 def tokenize_fr(text):
         return [tok.text for tok in spacy_fr.tokenizer(text)]
 
@@ -11,6 +8,9 @@ def tokenize_en(text):
         return [tok.text for tok in spacy_en.tokenizer(text)]
 
 def loadDataIWLST():
+    spacy_fr = spacy.load('fr')
+    spacy_en = spacy.load('en')
+
     BOS_WORD = '<s>'
     EOS_WORD = '</s>'
     BLANK_WORD = "<blank>"

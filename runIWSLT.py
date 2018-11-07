@@ -23,7 +23,11 @@ import dataLoaderIWLST
 #%matplotlib inline
 
 #create table of different GPUSs
-devices =[0]
+#print("current device index", torch.cuda.current_device())
+#current_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+print("number of available cuda devices : ", torch.cuda.device_count())
+devices = range(torch.cuda.device_count())
 
 #parameters
 justEvaluate = False
@@ -181,25 +185,27 @@ else :
     model = transformer.make_model(len(SRC.vocab), len(TGT.vocab), N=6)
     model_opt = transformer.NoamOpt(model.src_embed[0].d_model, 1, 2000,
             torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
-
+    
+#model.to(current_device)
 model.cuda()
 criterion = transformer.LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
 criterion.cuda()
+#criterion.to(current_device)
 
 print("Initializing iterators")
-train_iter = MyIterator(train, batch_size=BATCH_SIZE, device=0,
+train_iter = MyIterator(train, batch_size=BATCH_SIZE, device = 0,
                         repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
                         batch_size_fn=transformer.batch_size_fn, train=True)
-valid_iter = MyIterator(val, batch_size=BATCH_SIZE, device=0,
+valid_iter = MyIterator(val, batch_size=BATCH_SIZE, device = 0,
                         repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
                         batch_size_fn=transformer.batch_size_fn, train=False)
 
 #if more than one GPU, go parallel
-model_par = nn.DataParallel(model, device_ids=devices)
+model_par = nn.DataParallel(model, device_ids = devices)
 
 if not (justEvaluate) :
     print("Starting training")
-    training(model_par, model_opt, trainItNb, train_iter, valid_iter, validFreq, criterion, pad_idx)
+    training(model_par, model_opt, trainItNb, train_iter, valid_iter, validFreq, criterion, pad_idx, devices)
     evaluate(model_par, valid_iter, criterion, devices, model_opt, pad_idx)
 
     print("Saving network")

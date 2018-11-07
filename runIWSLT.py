@@ -5,13 +5,13 @@
 #wget https://s3.amazonaws.com/opennmt-models/iwslt.pt
 
 
-import numpy as np
+#import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import math, copy, time
+#import torch.nn.functional as F
+#import math, copy, time
 from torch.autograd import Variable
-from torchtext import data, datasets
+from torchtext import data#, datasets
 
 import transformer
 import dataLoaderIWLST 
@@ -27,12 +27,12 @@ devices =[0]
 
 #parameters
 justEvaluate = False
-loadTrain = False
+loadPreTrain = False
 trainItNb = 10
 BATCH_SIZE = 12000
 validFreq = 5
 previousEpochNb = 0
-modelSavePath = "../Model/modelIWSLT.nn"
+modelSavePath = ".Model/modelIWSLT.nn"
 
 class MyIterator(data.Iterator):
     def create_batches(self):
@@ -51,10 +51,11 @@ class MyIterator(data.Iterator):
             for b in data.batch(self.data(), self.batch_size,
                                           self.batch_size_fn):
                 self.batches.append(sorted(b, key=self.sort_key))
-        def rebatch(pad_idx, batch):
-            "Fix order in torchtext to match ours"
-            src, trg = batch.src.transpose(0, 1), batch.trg.transpose(0, 1)
-            return transformer.Batch(src, trg, pad_idx)
+
+def rebatch(pad_idx, batch):
+    "Fix order in torchtext to match ours"
+    src, trg = batch.src.transpose(0, 1), batch.trg.transpose(0, 1)
+    return transformer.Batch(src, trg, pad_idx)
 
 class MultiGPULossCompute:
     "A multi-gpu loss compute and train function."
@@ -153,17 +154,17 @@ def loadModel(PATH):
     epoch.load_state_dict(state['epoch'])
 
     return model,optimizer,batchSize,epoch
+
 ########################################################
 #run code starts here
 ########################################################
-
     
 #Load Data
 print("Loading Data")
 SRC,TGT,train,val,test, pad_idx = dataLoaderIWLST.loadDataIWLST()
 print("Data Loaded")
 
-if (loadModel | justEvaluate) :
+if (loadPreTrain or justEvaluate) :
     print("Loading pre-trained network")
     model, model_opt, BATCH_SIZE, previousEpochNb = loadModel(modelSavePath)
 else :
@@ -179,10 +180,10 @@ criterion.cuda()
 print("Initializing iterators")
 train_iter = MyIterator(train, batch_size=BATCH_SIZE, device=0,
                         repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
-                        batch_size_fn=batch_size_fn, train=True)
+                        batch_size_fn=transformer.batch_size_fn, train=True)
 valid_iter = MyIterator(val, batch_size=BATCH_SIZE, device=0,
                         repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
-                        batch_size_fn=batch_size_fn, train=False)
+                        batch_size_fn=transformer.batch_size_fn, train=False)
 
 #if more than one GPU, go parallel
 model_par = nn.DataParallel(model, device_ids=devices)

@@ -273,7 +273,7 @@ class LabelSmoothing(nn.Module):
             true_dist.index_fill_(0, mask.squeeze(), 0.0)
         self.true_dist = true_dist
         return self.criterion(x, Variable(true_dist, requires_grad=False))
-
+    
 class Batch:
     "Object for holding a batch of data with mask during training."
     def __init__(self, src, trg=None, pad=0):

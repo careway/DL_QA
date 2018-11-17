@@ -299,20 +299,18 @@ def run_epoch(data_iter, model, loss_compute, maxItNb):
     "Standard Training and Logging Function"
     total_tokens = 0
     total_loss = 0
-    tokens = 0
     for i, batch in enumerate(data_iter):
         out = model.forward(batch.src, batch.trg, 
                             batch.src_mask, batch.trg_mask)
         loss = loss_compute(out, batch.trg_y, batch.ntokens)
-        total_loss += loss
-        total_tokens += batch.ntokens
-        tokens += batch.ntokens
+        loss_d = loss
+        total_loss += loss_d.detach().cpu().numpy()
+        token_d = batch.ntokens
+        total_tokens += token_d.detach().cpu().numpy()
         print('\nEpoch ', i, 'loss ', loss)
         if i >= maxItNb : 
             break
-    lossNP = total_loss.detach().cpu().numpy()
-    tokensNP = total_tokens.detach().cpu().numpy()
-    return lossNP / tokensNP
+    return total_loss / total_tokens
 
 global max_src_in_batch, max_tgt_in_batch
 def batch_size_fn(new, count, sofar):

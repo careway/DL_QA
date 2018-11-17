@@ -44,7 +44,8 @@ print(device)
 #parameters
 justEvaluate = False
 loadPreTrain = False
-trainItNb = 500
+trainItNb = 2000
+validItNb = 200
 BATCH_SIZE = 10
 validFreq = 5
 previousEpochNb = 0
@@ -82,11 +83,10 @@ def rebatch(pad_idx, batch):
     src, trg = batch.src.transpose(0, 1), batch.trg.transpose(0, 1)
     return transformer.Batch(src, trg, pad_idx)
 
-def saveModel(model, epoch, optimizer, batchSize, PATH):
+def saveModel(model, epoch, batchSize, PATH):
     state = {
     'epoch': epoch,
     'state_dict': model.state_dict(),
-    'optimizer': optimizer.state_dict(),
     'batchSize' : batchSize
     }
     torch.save(state, PATH)
@@ -97,17 +97,13 @@ def loadModel(PATH, SRC, TGT):
     model = transformer.make_model(len(SRC.vocab), len(TGT.vocab))
     model.load_state_dict(state['state_dict'])
     
-    optimizer = transformer.NoamOpt(model.src_embed[0].d_model, 1, 2000,
-            torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))   
-    optimizer.load_state_dict(state['optimizer']) 
-    
     batchSize = 0
     batchSize.load_state_dict(state['batchSize'])
     
     epoch = 0
     epoch.load_state_dict(state['epoch'])
 
-    return model,optimizer,batchSize,epoch
+    return model,batchSize,epoch
 
 """**Initialize model, optimizer, criterion and iterators**"""
 
@@ -117,13 +113,13 @@ if (loadPreTrain or justEvaluate) :
 else :
     print("initializing network")
     model = transformer.make_model(len(SRC.vocab), len(TGT.vocab), N=6)
-    model_opt = transformer.NoamOpt(model.src_embed[0].d_model, 1, 2000,
-            torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
     
+model_opt = transformer.NoamOpt(model.src_embed[0].d_model, 1, 2000,
+            torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))    
 model.cuda()
-#criterion = transformer.LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
-criterion = nn.CrossEntropyLoss()
-criterion.cuda()
+criterion = transformer.LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
+#criterion = nn.CrossEntropyLoss()
+#criterion.cuda()
 
 
 
@@ -241,10 +237,7 @@ def training(model, optimizer, trainItNb, train_iter, valid_iter, validFreq, cri
     transformer.run_epoch((rebatch(pad_idx, b) for b in train_iter), 
         model, 
         SingleGPULossCompute(model.generator, criterion, 
-                             device=device, opt=optimizer), trainItNb)
-    #validation
-    evaluate(model, valid_iter, criterion, device, optimizer, pad_idx, trainItNb)
-    
+                             device=device, opt=optimizer), trainItNb)    
 
 def evaluate(model, valid_iter, criterion, device, optimizer, pad_idx, validItNb) :
     model.eval()
@@ -272,11 +265,11 @@ if not (justEvaluate) :
     #evaluate(model_par, valid_iter, criterion, devices, model_opt, pad_idx)
    
     training(model, model_opt, trainItNb, train_iter, valid_iter, validFreq, criterion, pad_idx, device)
-    evaluate(model, valid_iter, criterion, device, model_opt, pad_idx, trainItNb)
+    evaluate(model, valid_iter, criterion, device, model_opt, pad_idx, validItNb)
 
     print("Saving network")
     #saveModel(model_par, previousEpochNb + trainItNb, model_opt, BATCH_SIZE, modelSavePath)
-    saveModel(model, previousEpochNb + trainItNb, model_opt, BATCH_SIZE, modelSavePath)
+    saveModel(model, previousEpochNb + trainItNb, BATCH_SIZE, modelSavePath)
 else :
     evaluate(model, valid_iter, criterion, device, model_opt, pad_idx)
     #evaluate(model_par, valid_iter, criterion, devices, model_opt, pad_idx)

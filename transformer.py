@@ -9,6 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math, copy, time
 from torch.autograd import Variable
+#import tqdm
 
 ##visualization thingy
 #import matplotlib.pyplot as plt
@@ -294,9 +295,8 @@ class Batch:
             subsequent_mask(tgt.size(-1)).type_as(tgt_mask.data))
         return tgt_mask
 
-def run_epoch(data_iter, model, loss_compute):
+def run_epoch(data_iter, model, loss_compute, maxItNb):
     "Standard Training and Logging Function"
-    start = time.time()
     total_tokens = 0
     total_loss = 0
     tokens = 0
@@ -307,13 +307,12 @@ def run_epoch(data_iter, model, loss_compute):
         total_loss += loss
         total_tokens += batch.ntokens
         tokens += batch.ntokens
-        if i % 50 == 1:
-            elapsed = time.time() - start
-            print("Epoch Step: %d Loss: %f Tokens per Sec: %f" %
-                    (i, loss / batch.ntokens, tokens / elapsed))
-            start = time.time()
-            tokens = 0
-    return total_loss / total_tokens
+        print('\nEpoch ', i, 'loss ', loss)
+        if i >= maxItNb : 
+            break
+    lossNP = total_loss.detach().cpu().numpy()
+    tokensNP = total_tokens.detach().cpu().numpy()
+    return lossNP / tokensNP
 
 global max_src_in_batch, max_tgt_in_batch
 def batch_size_fn(new, count, sofar):

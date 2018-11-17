@@ -8,10 +8,10 @@ Original file is located at
 """
 
 ##stuff to download to get it to work
-!pip install torchtext spacy
-!python -m spacy download en
-!python -m spacy download fr
-!wget https://s3.amazonaws.com/opennmt-models/iwslt.pt
+#!pip install torchtext spacy
+#!python -m spacy download en
+#!python -m spacy download fr
+#!wget https://s3.amazonaws.com/opennmt-models/iwslt.pt
 
 
 #import numpy as np
@@ -44,7 +44,7 @@ print(device)
 #parameters
 justEvaluate = False
 loadPreTrain = False
-trainItNb = 10
+trainItNb = 500
 BATCH_SIZE = 10
 validFreq = 5
 previousEpochNb = 0
@@ -210,63 +210,48 @@ class SingleGPULossCompute:
         #self.chunk_size = chunk_size
         
     def __call__(self, out, targets, normalize):
-        
-        #out = out.to_device(self.device)
-        #targets= targets.to_device(self.device)
-        
+                
         out = out.to(device)
-        targets = targets.long().to(device)
+        targets = targets.to(device)
         
         #apply generator
         gen = self.generator.forward(out).to(device)
                 
-        #compute loss by applying criterion   
-       
-
+        #compute loss by applying criterion
         loss = 0
        
         for i in range(targets.size(1)):
           loss += self.criterion(gen[:, i, :], targets[:, i])
-          
-           
-        #backprop to transformer output
-        loss.backward()
         
-        #backprop through transformer
-        #grad1 = gen.grad.data.clone()
-        #gen.backward(gradient = grad1)
-        #step optimizer and zero_grad()
-        self.opt.step()
-        self.opt.optimizer.zero_grad()
+        if self.opt is not None:
+            #backprop to transformer output
+            loss.backward()
+            
+            #backprop through transformer
+            #grad1 = gen.grad.data.clone()
+            #gen.backward(gradient = grad1)
+            #step optimizer and zero_grad()
+            self.opt.step()
+            self.opt.optimizer.zero_grad()
         
         return loss      
     
 def training(model, optimizer, trainItNb, train_iter, valid_iter, validFreq, criterion, pad_idx, device) :
-    for epoch in range(trainItNb):
-        model.train()
-        #run_epoch computes the loss given the input optimizer function, which is here MultiGPULossCompute
-        #if the argument optimizer of MultiGPULossCompute isn't none then it will also perform the backprop
-        #transformer.run_epoch((rebatch(pad_idx, b) for b in train_iter), 
-        #          model, 
-        #          SingleGPULossCompute(model.generator, criterion, 
-        #                              device=device, opt=optimizer))
-        loss = transformer.run_epoch((rebatch(pad_idx, b) for b in train_iter), 
-                  model, 
-                  SingleGPULossCompute(model.generator, criterion, 
-                                      device=device, opt=optimizer))
-        print('\nTrain ({0:d} {1:d}%) Loss: {2:.4f}'.format(epoch, int(epoch/trainItNb*100), loss))
-        
-        #validation
-        if (epoch % validFreq == 0):
-              loss_eval = evaluate(model, valid_iter, criterion, device, optimizer, pad_idx)
-              print('\nEval ({0:d} {1:d}%) Loss: {2:.4f}'.format(epoch, int(epoch/trainItNb*100), loss_eval))
+    model.train()
+    transformer.run_epoch((rebatch(pad_idx, b) for b in train_iter), 
+        model, 
+        SingleGPULossCompute(model.generator, criterion, 
+                             device=device, opt=optimizer), trainItNb)
+    #validation
+    evaluate(model, valid_iter, criterion, device, optimizer, pad_idx, trainItNb)
+    
 
-def evaluate(model, valid_iter, criterion, device, optimizer, pad_idx) :
+def evaluate(model, valid_iter, criterion, device, optimizer, pad_idx, validItNb) :
     model.eval()
     loss = transformer.run_epoch((rebatch(pad_idx, b) for b in valid_iter), 
                      model, 
                      SingleGPULossCompute(model.generator, criterion, 
-                     device=device, opt=None))
+                     device=device, opt=None), validItNb)
     #loss = transformer.run_epoch((rebatch(pad_idx, b) for b in valid_iter), 
     #                 model, 
     #                 MultiGPULossCompute(model.generator, criterion, 
@@ -287,7 +272,7 @@ if not (justEvaluate) :
     #evaluate(model_par, valid_iter, criterion, devices, model_opt, pad_idx)
    
     training(model, model_opt, trainItNb, train_iter, valid_iter, validFreq, criterion, pad_idx, device)
-    evaluate(model, valid_iter, criterion, device, model_opt, pad_idx)
+    evaluate(model, valid_iter, criterion, device, model_opt, pad_idx, trainItNb)
 
     print("Saving network")
     #saveModel(model_par, previousEpochNb + trainItNb, model_opt, BATCH_SIZE, modelSavePath)

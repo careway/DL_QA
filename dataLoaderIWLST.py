@@ -34,6 +34,6 @@ def loadDataIWLST():
     SRC.build_vocab(train.src, min_freq=MIN_FREQ)
     TGT.build_vocab(train.trg, min_freq=MIN_FREQ)
 
-    pad_idx = TGT.vocab.stoi["<blank>"]
+    pad_idx = TGT.vocab.stoi[BLANK_WORD]
 
     return SRC,TGT,train,val,test, pad_idx

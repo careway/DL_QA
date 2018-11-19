@@ -115,7 +115,7 @@ else :
     model = transformer.make_model(len(SRC.vocab), len(TGT.vocab), N=6)
     
 model_opt = transformer.NoamOpt(model.src_embed[0].d_model, 1, 2000,
-            torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))    
+            torch.optim.Adam(model.parameters(), lr=0.001, betas=(0.9, 0.98), eps=1e-8))    
 model.cuda()
 criterion = transformer.LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
 #criterion = nn.CrossEntropyLoss()
@@ -198,7 +198,7 @@ class MultiGPULossCompute:
 
 class SingleGPULossCompute:
     "A single-gpu loss compute and train function."
-    def __init__(self, generator, criterion, device, opt=None, chunk_size=5):
+    def __init__(self, generator, criterion, device, opt=None):
         self.generator = generator
         self.criterion = criterion
         self.opt = opt
@@ -207,17 +207,21 @@ class SingleGPULossCompute:
         
     def __call__(self, out, targets, normalize):
                 
-        out = out.to(device)
+        out1 = out.to(device)
         targets = targets.to(device)
         
         #apply generator
-        gen = self.generator.forward(out).to(device)
+        gen = self.generator.forward(out1).to(device)
                 
         #compute loss by applying criterion
         loss = 0
        
-        for i in range(targets.size(1)):
-          loss += self.criterion(gen[:, i, :], targets[:, i])
+        loss = self.criterion(gen[:, :, :].contiguous().view(-1, gen.size(-1)), targets[:, :].contiguous().view(-1))
+
+
+        normalize = normalize.float()
+        l = loss.sum()[0] / normalize
+        total = l.data[0]
         
         if self.opt is not None:
             #backprop to transformer output
@@ -230,7 +234,7 @@ class SingleGPULossCompute:
             self.opt.step()
             self.opt.optimizer.zero_grad()
         
-        return loss      
+        return total*normalize      
     
 def training(model, optimizer, trainItNb, train_iter, valid_iter, validFreq, criterion, pad_idx, device) :
     model.train()

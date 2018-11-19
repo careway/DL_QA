@@ -46,7 +46,7 @@ justEvaluate = False
 loadPreTrain = False
 trainItNb = 2000
 validItNb = 200
-BATCH_SIZE = 10
+BATCH_SIZE = 100
 validFreq = 5
 previousEpochNb = 0
 modelSavePath = "Model/modelIWSLT.nn"
@@ -115,7 +115,7 @@ else :
     model = transformer.make_model(len(SRC.vocab), len(TGT.vocab), N=6)
     
 model_opt = transformer.NoamOpt(model.src_embed[0].d_model, 1, 2000,
-            torch.optim.Adam(model.parameters(), lr=0.001, betas=(0.9, 0.98), eps=1e-8))    
+            torch.optim.Adam(filter(lambda x: x.requires_grad, model.parameters()), lr=0.001, betas=(0.9, 0.98), eps=1e-8))    
 model.cuda()
 criterion = transformer.LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
 #criterion = nn.CrossEntropyLoss()
@@ -210,6 +210,8 @@ class SingleGPULossCompute:
         out1 = out.to(device)
         targets = targets.to(device)
         
+        out1= Variable(out[:, :].data, requires_grad=self.opt is not None)
+        print(out1)
         #apply generator
         gen = self.generator.forward(out1).to(device)
                 
@@ -219,16 +221,14 @@ class SingleGPULossCompute:
 
 
         normalize = normalize.float()
-        l = loss.sum()[0] / normalize
-        total = l.data[0]
+        l = loss.sum() / normalize
+        total = l.data
         
         if self.opt is not None:
             #backprop to transformer output
-            loss.backward()            
-
-            o2 = out1.grad.clone()
-            
-            out1.backward(gradient=o2)
+            l.backward()
+            out_grad= out1.grad.data.clone()
+            out1.backward(gradient=out_grad)
             
             #backprop through transformer
             #grad1 = gen.grad.data.clone()

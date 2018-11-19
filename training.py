@@ -214,7 +214,6 @@ class SingleGPULossCompute:
         gen = self.generator.forward(out1).to(device)
                 
         #compute loss by applying criterion
-        loss = 0
        
         loss = self.criterion(gen[:, :, :].contiguous().view(-1, gen.size(-1)), targets[:, :].contiguous().view(-1))
 
@@ -225,7 +224,11 @@ class SingleGPULossCompute:
         
         if self.opt is not None:
             #backprop to transformer output
-            loss.backward()
+            loss.backward()            
+
+            o2 = out1.grad.clone()
+            
+            out1.backward(gradient=o2)
             
             #backprop through transformer
             #grad1 = gen.grad.data.clone()
@@ -233,6 +236,7 @@ class SingleGPULossCompute:
             #step optimizer and zero_grad()
             self.opt.step()
             self.opt.optimizer.zero_grad()
+            out=out1
         
         return total*normalize      
     

@@ -42,7 +42,7 @@ print("WARNING : As of now MultiGpu is not supported so all options using MultiG
 device = torch.device(torch.cuda.current_device())
 print(device)
 #parameters
-justEvaluate = False
+justEvaluate = True
 loadPreTrain = False
 trainItNb = 2000
 validItNb = 200
@@ -115,8 +115,8 @@ else :
 model_opt = transformer.NoamOpt(model.src_embed[0].d_model, 1, 2000,
             torch.optim.Adam(filter(lambda x: x.requires_grad, model.parameters()), lr=0.001, betas=(0.9, 0.98), eps=1e-8))    
 model.cuda()
-criterion = transformer.LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
-#criterion = nn.CrossEntropyLoss()
+#criterion = transformer.LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
+criterion = nn.CrossEntropyLoss()
 #criterion.cuda()
 
 
@@ -175,7 +175,22 @@ class SingleGPULossCompute:
             out=out1
         
         return total*normalize      
-    
+        
+def greedy_decode(model, src, src_mask, max_len, start_symbol):
+    memory = model.encode(src, src_mask)
+    ys = torch.ones(1, 1).fill_(start_symbol).type_as(src.data)
+    for i in range(max_len-1):
+        out = model.decode(memory, src_mask, 
+                           Variable(ys), 
+                           Variable(transformer.subsequent_mask(ys.size(1))
+                                    .type_as(src.data)))
+        prob = model.generator(out[:, -1])
+        _, next_word = torch.max(prob, dim = 1)
+        next_word = next_word.data[0]
+        ys = torch.cat([ys, 
+                        torch.ones(1, 1).type_as(src.data).fill_(next_word)], dim=1)
+    return ys
+
 def training(model, optimizer, trainItNb, train_iter, valid_iter, validFreq, criterion, pad_idx, device) :
     model.train()
     transformer.run_epoch((rebatch(pad_idx, b) for b in train_iter), 
@@ -190,6 +205,24 @@ def evaluate(model, valid_iter, criterion, device, optimizer, pad_idx, validItNb
                      model, 
                      SingleGPULossCompute(model.generator, criterion, 
                      device=device, opt=None), validItNb)
+                     
+    for i, batch in enumerate(valid_iter):
+        src = batch.src.transpose(0, 1)[:1]
+        src_mask = (src != SRC.vocab.stoi["<blank>"]).unsqueeze(-2)
+        out = greedy_decode(model, src, src_mask, 
+                            max_len=60, start_symbol=TGT.vocab.stoi["<s>"])
+        print("Translation:", end="\t")
+        for i in range(1, out.size(1)):
+            sym = TGT.vocab.itos[out[0, i]]
+            if sym == "</s>": break
+            print(sym, end =" ")
+        print()
+        print("Target:", end="\t")
+        for i in range(1, batch.trg.size(0)):
+            sym = TGT.vocab.itos[batch.trg.data[i, 0]]
+            if sym == "</s>": break
+            print(sym, end =" ")
+        print()
     #loss = transformer.run_epoch((rebatch(pad_idx, b) for b in valid_iter), 
     #                 model, 
     #                 MultiGPULossCompute(model.generator, criterion, 

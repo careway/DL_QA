@@ -83,6 +83,20 @@ def rebatch(pad_idx, batch):
     src, trg = batch.src.transpose(0, 1), batch.trg.transpose(0, 1)
     return transformer.Batch(src, trg, pad_idx)
 
+
+"""Visualisation """
+import matplotlib.pyplot as plt
+import seaborn
+seaborn.set_context(context="talk")
+
+def draw(data, x, y, ax):
+    seaborn.heatmap(data, 
+                    xticklabels=x, square=True, yticklabels=y, vmin=0.0, vmax=1.0, 
+                    cbar=False, ax=ax)
+    #plt.imshow(data, cmap='hot', interpolation='nearest', vmin=0.0, vmax=1.0,)
+
+"""load/save"""
+
 def saveModel(model,model_opt ,epoch, batchSize, PATH):
     state = {
     'epoch': epoch,
@@ -205,28 +219,70 @@ def evaluate(model, valid_iter, criterion, device, optimizer, pad_idx, validItNb
                      model, 
                      SingleGPULossCompute(model.generator, criterion, 
                      device=device, opt=None), validItNb)
-                     
+    j = 0       
     for i, batch in enumerate(valid_iter):
+        j += 1
         src = batch.src.transpose(0, 1)[:1]
         src_mask = (src != SRC.vocab.stoi["<blank>"]).unsqueeze(-2)
         out = greedy_decode(model, src, src_mask, 
                             max_len=60, start_symbol=TGT.vocab.stoi["<s>"])
-        print("Translation:", end="\t")
+        
+        print("Source:")    
+        sent = "<s> "
+        for i in range(1, batch.src.size(0)):
+            sym = SRC.vocab.itos[batch.src.data[i, 0]]
+            if sym == "</s>": break
+            sent += sym + " "
+        print(sent)
+        
+        print("Translation:")
+        trans = "<s> "
         for i in range(1, out.size(1)):
             sym = TGT.vocab.itos[out[0, i]]
             if sym == "</s>": break
-            print(sym, end =" ")
-        print()
-        print("Target:", end="\t")
+            trans += sym + " "
+        print(trans)
+        print("Target:")
+        tgt_print = ""
         for i in range(1, batch.trg.size(0)):
             sym = TGT.vocab.itos[batch.trg.data[i, 0]]
             if sym == "</s>": break
-            print(sym, end =" ")
-        print()
+            tgt_print += sym + " "
+        print(tgt_print)
     #loss = transformer.run_epoch((rebatch(pad_idx, b) for b in valid_iter), 
     #                 model, 
     #                 MultiGPULossCompute(model.generator, criterion, 
     #                 devices=devices, opt=None))
+        if (j == 1):  
+            print("Plotting and exporting graphs")
+            
+            tgt_sent = trans.split()        
+            for layer in range(1, 6, 2):
+                num = str(layer+1)
+                fig, axs = plt.subplots(1,4, figsize=(20, 10))
+                print("Encoder Layer", layer+1)
+                for h in range(4):
+                    draw(model.encoder.layers[layer].self_attn.attn[0, h].data, 
+                        sent, sent if h ==0 else [], ax=axs[h])
+                plt.show()
+                plt.savefig('encoderlayer_' + num + ' .png')
+        
+            for layer in range(1, 6, 2):
+                num = str(layer+1)
+                fig, axs = plt.subplots(1,4, figsize=(20, 10))
+                print("Decoder Self Layer", layer+1)
+                for h in range(4):
+                    draw(model.decoder.layers[layer].self_attn.attn[0, h].data[:len(tgt_sent), :len(tgt_sent)], 
+                        tgt_sent, tgt_sent if h ==0 else [], ax=axs[h])
+                plt.show()
+                plt.savefig('DecoderSelfLayer_' + num + ' .png')
+            print("Decoder Src Layer", layer+1)
+            fig, axs = plt.subplots(1,4, figsize=(20, 10))
+            for h in range(4):
+                draw(model.decoder.layers[layer].self_attn.attn[0, h].data[:len(tgt_sent), :len(sent)], 
+                    sent, tgt_sent if h ==0 else [], ax=axs[h])
+            plt.show()
+            plt.savefig('DecoderSrcLayer_' + num + ' .png')
     
     print("loss : ", loss)
 

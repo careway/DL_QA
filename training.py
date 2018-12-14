@@ -228,12 +228,12 @@ def evaluate(model, valid_iter, criterion, device, optimizer, pad_idx, validItNb
                             max_len=60, start_symbol=TGT.vocab.stoi["<s>"])
         
         print("Source:")    
-        sent = "<s> "
+        src_txt = "<s> "
         for i in range(1, batch.src.size(0)):
             sym = SRC.vocab.itos[batch.src.data[i, 0]]
             if sym == "</s>": break
-            sent += sym + " "
-        print(sent)
+            src_txt += sym + " "
+        print(src_txt.encode("utf-8"))
         
         print("Translation:")
         trans = "<s> "
@@ -241,22 +241,26 @@ def evaluate(model, valid_iter, criterion, device, optimizer, pad_idx, validItNb
             sym = TGT.vocab.itos[out[0, i]]
             if sym == "</s>": break
             trans += sym + " "
-        print(trans)
+        print(trans.encode("utf-8"))
         print("Target:")
         tgt_print = ""
         for i in range(1, batch.trg.size(0)):
             sym = TGT.vocab.itos[batch.trg.data[i, 0]]
             if sym == "</s>": break
             tgt_print += sym + " "
-        print(tgt_print)
+        print(tgt_print.encode("utf-8"))
     #loss = transformer.run_epoch((rebatch(pad_idx, b) for b in valid_iter), 
     #                 model, 
     #                 MultiGPULossCompute(model.generator, criterion, 
     #                 devices=devices, opt=None))
-        if (j == 1):  
+        if (j == 10):  
             print("Plotting and exporting graphs")
             
-            tgt_sent = trans.split()        
+            tgt_sent = trans.split()   
+            sent = src_txt.split()
+            print(len(tgt_sent))
+            print(len(sent))
+            
             for layer in range(1, 6, 2):
                 num = str(layer+1)
                 fig, axs = plt.subplots(1,4, figsize=(20, 10))

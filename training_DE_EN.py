@@ -25,6 +25,22 @@ from torchtext import data#, datasets
 import transformer
 import dataLoaderIWLST_DE_EN
 
+from transformer import EncoderDecoder as EncoderDecoder
+from transformer import Encoder as Encoder
+from transformer import Decoder as Decoder
+from transformer import Generator as Generator 
+from transformer import LayerNorm as LayerNorm
+from transformer import SublayerConnection as SublayerConnection
+from transformer import EncoderLayer as EncoderLayer
+from transformer import DecoderLayer as DecoderLayer
+from transformer import MultiHeadedAttention as MultiHeadedAttention
+from transformer import PositionwiseFeedForward as PositionwiseFeedForward
+from transformer import Embeddings as Embeddings
+from transformer import PositionalEncoding as PositionalEncoding
+from transformer import LabelSmoothing as LabelSmoothing
+from transformer import Batch as Batch
+from transformer import NoamOpt as NoamOpt
+
 ##visualization thingy
 #import matplotlib.pyplot as plt
 #import seaborn
@@ -269,7 +285,7 @@ def evaluate(model, valid_iter, criterion, device, optimizer, pad_idx, validItNb
             print("Decoder Src Layer", layer+1)
             fig, axs = plt.subplots(1,4, figsize=(20, 10))
             for h in range(4):
-                draw(model.decoder.layers[layer].self_attn.attn[0, h].data[:len(tgt_sent), :len(sent)], 
+                draw(model.decoder.layers[layer].src_attn.attn[0, h].data[:len(tgt_sent), :len(sent)], 
                     sent, tgt_sent if h ==0 else [], ax=axs[h])
             plt.show()
             plt.savefig('DecoderSrcLayer_' + num + ' .png')

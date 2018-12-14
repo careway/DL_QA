@@ -358,6 +358,7 @@ def get_std_opt(model):
             
 def loadModel(path, SRC, TGT, device):
     state = torch.load(path, map_location=device)
+    print(state)
     model = make_model(len(SRC.vocab), len(TGT.vocab))
     model.load_state_dict(state['state_dict'])
     batchSize = state['batchSize']

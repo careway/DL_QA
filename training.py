@@ -42,7 +42,7 @@ print("WARNING : As of now MultiGpu is not supported so all options using MultiG
 device = torch.device(torch.cuda.current_device())
 print(device)
 #parameters
-justEvaluate = True
+justEvaluate = False
 loadPreTrain = False
 trainItNb = 2000
 validItNb = 200
@@ -262,7 +262,7 @@ def evaluate(model, valid_iter, criterion, device, optimizer, pad_idx, validItNb
                 fig, axs = plt.subplots(1,4, figsize=(20, 10))
                 print("Encoder Layer", layer+1)
                 for h in range(4):
-                    draw(model.encoder.layers[layer].self_attn.attn[0, h].data, 
+                    draw(model.encoder.layers[layer].self_attn.attn[0, h].data[:len(sent), :len(sent)], 
                         sent, sent if h ==0 else [], ax=axs[h])
                 plt.show()
                 plt.savefig('encoderlayer_' + num + ' .png')
@@ -279,7 +279,7 @@ def evaluate(model, valid_iter, criterion, device, optimizer, pad_idx, validItNb
             print("Decoder Src Layer", layer+1)
             fig, axs = plt.subplots(1,4, figsize=(20, 10))
             for h in range(4):
-                draw(model.decoder.layers[layer].self_attn.attn[0, h].data[:len(tgt_sent), :len(sent)], 
+                draw(model.decoder.layers[layer].src_attn.attn[0, h].data[:len(tgt_sent), :len(sent)], 
                     sent, tgt_sent if h ==0 else [], ax=axs[h])
             plt.show()
             plt.savefig('DecoderSrcLayer_' + num + ' .png')

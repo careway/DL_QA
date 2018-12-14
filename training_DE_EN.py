@@ -81,7 +81,19 @@ def rebatch(pad_idx, batch):
     "Fix order in torchtext to match ours"
     src, trg = batch.src.transpose(0, 1), batch.trg.transpose(0, 1)
     return transformer.Batch(src, trg, pad_idx)
+    
+"""Visualisation """
+import matplotlib.pyplot as plt
+import seaborn
+seaborn.set_context(context="talk")
 
+def draw(data, x, y, ax):
+    seaborn.heatmap(data, 
+                    xticklabels=x, square=True, yticklabels=y, vmin=0.0, vmax=1.0, 
+                    cbar=False, ax=ax)
+    #plt.imshow(data, cmap='hot', interpolation='nearest', vmin=0.0, vmax=1.0,)
+
+"""load/save"""
 def saveModel(model,model_opt ,epoch, batchSize, PATH):
     state = {
     'epoch': epoch,

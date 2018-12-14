@@ -12,6 +12,7 @@ module load python3/3.6.2
 #source train_model/bin/activate
 
 pip3 install --user os
+pip3 install --user --upgrade torch
 pip3 install --user matplotlib
 pip3 install --user torch torchvision
 pip3 install --user torchtext spacy

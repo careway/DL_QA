@@ -42,9 +42,9 @@ print("WARNING : As of now MultiGpu is not supported so all options using MultiG
 device = torch.device(torch.cuda.current_device())
 print(device)
 #parameters
-justEvaluate = False
+justEvaluate = True
 loadPreTrain = False
-trainItNb = 2000
+trainItNb = 35000
 validItNb = 200
 BATCH_SIZE = 100
 validFreq = 5
@@ -90,7 +90,7 @@ import seaborn
 seaborn.set_context(context="talk")
 
 def draw(data, x, y, ax):
-    seaborn.heatmap(data, 
+    seaborn.heatmap(data.cpu(), 
                     xticklabels=x, square=True, yticklabels=y, vmin=0.0, vmax=1.0, 
                     cbar=False, ax=ax)
     #plt.imshow(data, cmap='hot', interpolation='nearest', vmin=0.0, vmax=1.0,)
@@ -153,42 +153,18 @@ class SingleGPULossCompute:
         self.generator = generator
         self.criterion = criterion
         self.opt = opt
-        self.device = device
+        #self.device = device
         #self.chunk_size = chunk_size
         
-    def __call__(self, out, targets, normalize):
-                
-        out1 = out.to(device)
-        targets = targets.to(device)
-        
-        out1= Variable(out[:, :].data, requires_grad=self.opt is not None)
-        #apply generator
-        gen = self.generator.forward(out1).to(device)
-                
-        #compute loss by applying criterion
-        loss = self.criterion(gen[:, :, :].contiguous().view(-1, gen.size(-1)), 
-                                      targets[:, :].contiguous().view(-1))
-        #loss = self.criterion(y);
-
-        normalize = normalize.float()
-        l = loss.sum() / normalize
-        total = l.data
-        
+    def __call__(self, x, y, norm):
+        x = self.generator(x)
+        norm = norm.float()
+        loss = self.criterion(x.contiguous().view(-1, x.size(-1)), y.contiguous().view(-1)) / norm
+        loss.backward()
         if self.opt is not None:
-            #backprop to transformer output
-            l.backward()
-            out_grad= out1.grad.data.clone()
-            out1.backward(gradient=out_grad)
-            
-            #backprop through transformer
-            #grad1 = gen.grad.data.clone()
-            #gen.backward(gradient = grad1)
-            #step optimizer and zero_grad()
             self.opt.step()
             self.opt.optimizer.zero_grad()
-            out=out1
-        
-        return total*normalize      
+        return loss.item() * norm.item()
         
 def greedy_decode(model, src, src_mask, max_len, start_symbol):
     memory = model.encode(src, src_mask)
@@ -253,42 +229,61 @@ def evaluate(model, valid_iter, criterion, device, optimizer, pad_idx, validItNb
     #                 model, 
     #                 MultiGPULossCompute(model.generator, criterion, 
     #                 devices=devices, opt=None))
-        if (j == 10):  
-            print("Plotting and exporting graphs")
-            
-            tgt_sent = trans.split()   
-            sent = src_txt.split()
-            print(len(tgt_sent))
-            print(len(sent))
-            
-            for layer in range(1, 6, 2):
-                num = str(layer+1)
-                fig, axs = plt.subplots(1,4, figsize=(20, 10))
-                print("Encoder Layer", layer+1)
-                for h in range(4):
-                    draw(model.encoder.layers[layer].self_attn.attn[0, h].data[:len(sent), :len(sent)], 
-                        sent, sent if h ==0 else [], ax=axs[h])
-                plt.show()
-                plt.savefig('encoderlayer_' + num + ' .png')
-        
-            for layer in range(1, 6, 2):
-                num = str(layer+1)
-                fig, axs = plt.subplots(1,4, figsize=(20, 10))
-                print("Decoder Self Layer", layer+1)
-                for h in range(4):
-                    draw(model.decoder.layers[layer].self_attn.attn[0, h].data[:len(tgt_sent), :len(tgt_sent)], 
-                        tgt_sent, tgt_sent if h ==0 else [], ax=axs[h])
-                plt.show()
-                plt.savefig('DecoderSelfLayer_' + num + ' .png')
-            print("Decoder Src Layer", layer+1)
-            fig, axs = plt.subplots(1,4, figsize=(20, 10))
-            for h in range(4):
-                draw(model.decoder.layers[layer].src_attn.attn[0, h].data[:len(tgt_sent), :len(sent)], 
-                    sent, tgt_sent if h ==0 else [], ax=axs[h])
-            plt.show()
-            plt.savefig('DecoderSrcLayer_' + num + ' .png')
-    
     print("loss : ", loss)
+    
+    """Translate default sentence"""
+    print("Source:")
+    print("Le cheval est grand .")
+    sent = """Le cheval est grand .""".split()  
+    src = torch.LongTensor([[SRC.vocab.stoi[w] for w in sent]])
+    src = Variable(src).cuda()
+    src_mask = (src != SRC.vocab.stoi["<blank>"]).unsqueeze(-2)
+    out = greedy_decode(model, src, src_mask,max_len=60, 
+                        start_symbol=TGT.vocab.stoi["<s>"])
+    print("Translation:")
+    trans = "<s> "
+    for i in range(1, out.size(1)):
+        sym = TGT.vocab.itos[out[0, i]]
+        if sym == "</s>": break
+        trans += sym + " "
+    print(trans.encode("utf-8"))                   
+    print("Target :")
+    print("The horse is big .")
+    
+    print("Plotting and exporting graphs")
+    
+    tgt_sent = trans.split()   
+    print(len(tgt_sent))
+    print(len(sent))
+    
+    for layer in range(1, 6, 2):
+        num = str(layer+1)
+        fig, axs = plt.subplots(1,4, figsize=(20, 10))
+        print("Encoder Layer", layer+1)
+        for h in range(4):
+            draw(model.encoder.layers[layer].self_attn.attn[0, h].data[:len(sent), :len(sent)], 
+                sent, sent if h ==0 else [], ax=axs[h])
+        plt.show()
+        plt.savefig('encoderlayer_' + num + ' .svg')
+
+    for layer in range(1, 6, 2):
+        num = str(layer+1)
+        fig, axs = plt.subplots(1,4, figsize=(20, 10))
+        print("Decoder Self Layer", layer+1)
+        for h in range(4):
+            draw(model.decoder.layers[layer].self_attn.attn[0, h].data[:len(tgt_sent), :len(tgt_sent)], 
+                tgt_sent, tgt_sent if h ==0 else [], ax=axs[h])
+        plt.show()
+        plt.savefig('DecoderSelfLayer_' + num + ' .svg')
+    print("Decoder Src Layer", layer+1)
+    fig, axs = plt.subplots(1,4, figsize=(20, 10))
+    for h in range(4):
+        draw(model.decoder.layers[layer].src_attn.attn[0, h].data[:len(tgt_sent), :len(sent)], 
+            sent, tgt_sent if h ==0 else [], ax=axs[h])
+    plt.show()
+    plt.savefig('DecoderSrcLayer_' + num + ' .svg')
+
+    
 
 """**Run training/Evaluate**""" 
 

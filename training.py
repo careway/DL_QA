@@ -42,9 +42,9 @@ print("WARNING : As of now MultiGpu is not supported so all options using MultiG
 device = torch.device(torch.cuda.current_device())
 print(device)
 #parameters
-justEvaluate = True
+justEvaluate = False
 loadPreTrain = False
-trainItNb = 35000
+trainItNb = 2000
 validItNb = 200
 BATCH_SIZE = 100
 validFreq = 5
@@ -136,12 +136,17 @@ criterion = nn.CrossEntropyLoss()
 
 
 print("Initializing iterators")
-train_iter = MyIterator(train, batch_size=BATCH_SIZE, device = device,
-                        repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
-                        batch_size_fn=transformer.batch_size_fn, train=True)
-valid_iter = MyIterator(val, batch_size=BATCH_SIZE, device = device,
-                        repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
-                        batch_size_fn=transformer.batch_size_fn, train=False)
+#train_iter = MyIterator(train, batch_size=BATCH_SIZE, device = device,
+#                        repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
+#                        batch_size_fn=transformer.batch_size_fn, train=True)
+#valid_iter = MyIterator(val, batch_size=BATCH_SIZE, device = device,
+#                        repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
+#                        batch_size_fn=transformer.batch_size_fn, train=False)
+
+train_iter = data.BucketIterator(train, batch_size=BATCH_SIZE, device=0, repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)), train=True)
+valid_iter = data.BucketIterator(val, batch_size=BATCH_SIZE, device=0, repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)), train=False)
+train_iter.cuda()
+valid_iter.cuda()
 
 #if more than one GPU, go parallel
 #model_par = nn.DataParallel(model, device_ids = devices)

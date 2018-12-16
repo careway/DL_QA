@@ -273,6 +273,7 @@ def run_epoch(data_iter, model, loss_compute, maxItNb):
         print('\nEpoch ', i, 'loss ', loss/batch.ntokens.float())
         if i >= maxItNb : 
             break
+        torch.cuda.empty_cache()
     return total_loss / total_tokens
 
 global max_src_in_batch, max_tgt_in_batch
@@ -316,8 +317,6 @@ class NoamOpt:
         return self.factor * (self.model_size ** (-0.5) * min(step ** (-0.5), step * self.warmup ** (-1.5)))
 
 
-def get_std_opt(model):
-    return NoamOpt(model.src_embed[0].d_model, 2, 4000, torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
 
 def loadModel(path, SRC, TGT, device):
     state = torch.load(path, map_location=device)

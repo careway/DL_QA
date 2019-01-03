@@ -193,7 +193,7 @@ def training(model, optimizer, trainItNb, train_iter, valid_iter, validFreq, cri
         model, 
         SingleGPULossCompute(model.generator, criterion, 
                              device=device, opt=optimizer), trainItNb)    
-    iterations = range(0, len(lossArray) - 1)
+    iterations = range(0, len(lossArray))
     plt.figure(figsize=(21,7)) 
     plt.plot(iterations, lossArray, label = "training loss")
     plt.title('loss', fontsize=20)

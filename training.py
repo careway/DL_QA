@@ -44,12 +44,14 @@ print(device)
 #parameters
 justEvaluate = False
 loadPreTrain = False
-trainItNb = 2000
-validItNb = 200
+trainItNb = 20000
+validItNb = 100
 BATCH_SIZE = 100
 validFreq = 5
 previousEpochNb = 0
 modelSavePath = "Model/modelIWSLT.nn"
+testSentence = """Il y a un secret pour travailler avec les entrepreneurs ."""
+testTranslation = """There is a secret for working with entrepreneurs ."""
 
 """**Load Data **"""
 
@@ -187,10 +189,16 @@ def greedy_decode(model, src, src_mask, max_len, start_symbol):
 
 def training(model, optimizer, trainItNb, train_iter, valid_iter, validFreq, criterion, pad_idx, device) :
     model.train()
-    transformer.run_epoch((rebatch(pad_idx, b) for b in train_iter), 
+    tot_loss, lossArray = transformer.run_epoch((rebatch(pad_idx, b) for b in train_iter), 
         model, 
         SingleGPULossCompute(model.generator, criterion, 
                              device=device, opt=optimizer), trainItNb)    
+    iterations = range(0, len(lossArray) - 1)
+    plt.figure(figsize=(21,7)) 
+    plt.plot(iterations, lossArray, label = "training loss")
+    plt.title('loss', fontsize=20)
+    plt.show()
+    plt.savefig('loss.svg')
 
 def evaluate(model, valid_iter, criterion, device, optimizer, pad_idx, validItNb) :
     model.eval()
@@ -199,46 +207,128 @@ def evaluate(model, valid_iter, criterion, device, optimizer, pad_idx, validItNb
                      model, 
                      SingleGPULossCompute(model.generator, criterion, 
                      device=device, opt=None), validItNb)
-    j = 0       
-    for i, batch in enumerate(valid_iter):
-        j += 1
-        src = batch.src.transpose(0, 1)[:1]
-        src_mask = (src != SRC.vocab.stoi["<blank>"]).unsqueeze(-2)
-        out = greedy_decode(model, src, src_mask, 
-                            max_len=60, start_symbol=TGT.vocab.stoi["<s>"])
-        
-        print("Source:")    
-        src_txt = "<s> "
-        for i in range(1, batch.src.size(0)):
-            sym = SRC.vocab.itos[batch.src.data[i, 0]]
-            if sym == "</s>": break
-            src_txt += sym + " "
-        print(src_txt.encode("utf-8"))
-        
-        print("Translation:")
-        trans = "<s> "
-        for i in range(1, out.size(1)):
-            sym = TGT.vocab.itos[out[0, i]]
-            if sym == "</s>": break
-            trans += sym + " "
-        print(trans.encode("utf-8"))
-        print("Target:")
-        tgt_print = ""
-        for i in range(1, batch.trg.size(0)):
-            sym = TGT.vocab.itos[batch.trg.data[i, 0]]
-            if sym == "</s>": break
-            tgt_print += sym + " "
-        print(tgt_print.encode("utf-8"))
+#    j = 0       
+#    for i, batch in enumerate(valid_iter):
+#        j += 1
+#        src = batch.src.transpose(0, 1)[:1]
+#        src_mask = (src != SRC.vocab.stoi["<blank>"]).unsqueeze(-2)
+#        out = greedy_decode(model, src, src_mask, 
+#                            max_len=60, start_symbol=TGT.vocab.stoi["<s>"])
+#        
+#        print("Source:")    
+#        src_txt = "<s> "
+#        for i in range(1, batch.src.size(0)):
+#            sym = SRC.vocab.itos[batch.src.data[i, 0]]
+#            if sym == "</s>": break
+#            src_txt += sym + " "
+#        print(src_txt.encode("utf-8"))
+#        
+#        print("Translation:")
+#        trans = "<s> "
+#        for i in range(1, out.size(1)):
+#            sym = TGT.vocab.itos[out[0, i]]
+#            if sym == "</s>": break
+#            trans += sym + " "
+#        print(trans.encode("utf-8"))
+#        print("Target:")
+#        tgt_print = ""
+#        for i in range(1, batch.trg.size(0)):
+#            sym = TGT.vocab.itos[batch.trg.data[i, 0]]
+#            if sym == "</s>": break
+#            tgt_print += sym + " "
+#        print(tgt_print.encode("utf-8"))
+#        
+#        sent = src_txt.split()
+#        tgt_sent = trans.split()   
+#        if (j == 10):
+#            for layer in range(1, 6, 2):
+#                num = str(layer+1)
+#                fig, axs = plt.subplots(1,4, figsize=(40, 40))
+#                print("Encoder Layer_frombatch_", layer+1)
+#                for h in range(4):
+#                    draw(model.encoder.layers[layer].self_attn.attn[0, h].data[:len(sent), :len(sent)], 
+#                        sent, sent if h ==0 else [], ax=axs[h])
+#                plt.show()
+#                plt.savefig('encoderlayer__frombatch_' + num + ' .svg')
+#        
+#            for layer in range(1, 6, 2):
+#                num = str(layer+1)
+#                fig, axs = plt.subplots(1,4, figsize=(40, 40))
+#                print("Decoder Self Layer", layer+1)
+#                for h in range(4):
+#                    draw(model.decoder.layers[layer].self_attn.attn[0, h].data[:len(tgt_sent), :len(tgt_sent)], 
+#                        tgt_sent, tgt_sent if h ==0 else [], ax=axs[h])
+#                plt.show()
+#                plt.savefig('DecoderSelfLayer__frombatch_' + num + ' .svg')
+#            print("Decoder Src Layer", layer+1)
+#            fig, axs = plt.subplots(1,4, figsize=(40, 40))
+#            for h in range(4):
+#                draw(model.decoder.layers[layer].src_attn.attn[0, h].data[:len(tgt_sent), :len(sent)], 
+#                    sent, tgt_sent if h ==0 else [], ax=axs[h])
+#            plt.show()
+#            plt.savefig('DecoderSrcLayer_frombatch_' + num + ' .svg')
     #loss = transformer.run_epoch((rebatch(pad_idx, b) for b in valid_iter), 
     #                 model, 
     #                 MultiGPULossCompute(model.generator, criterion, 
     #                 devices=devices, opt=None))
     print("loss : ", loss)
     
+#    """Translate default sentence"""
+#    print("Source:")
+#    print("Le cheval est grand .")
+#    sent = """Le cheval est grand .""".split()  
+#    src = torch.LongTensor([[SRC.vocab.stoi[w] for w in sent]])
+#    src = Variable(src).cuda()
+#    src_mask = (src != SRC.vocab.stoi["<blank>"]).unsqueeze(-2)
+#    out = greedy_decode(model, src, src_mask,max_len=60, 
+#                        start_symbol=TGT.vocab.stoi["<s>"])
+#    print("Translation:")
+#    trans = "<s> "
+#    for i in range(1, out.size(1)):
+#        sym = TGT.vocab.itos[out[0, i]]
+#        if sym == "</s>": break
+#        trans += sym + " "
+#    print(trans.encode("utf-8"))                   
+#    print("Target :")
+#    print("The horse is big .")
+#    
+#    print("Plotting and exporting graphs")
+#    
+#    tgt_sent = trans.split()   
+#    print(len(tgt_sent))
+#    print(len(sent))
+#    
+#    for layer in range(1, 6, 2):
+#        num = str(layer+1)
+#        fig, axs = plt.subplots(1,4, figsize=(20, 10))
+#        print("Encoder Layer", layer+1)
+#        for h in range(4):
+#            draw(model.encoder.layers[layer].self_attn.attn[0, h].data[:len(sent), :len(sent)], 
+#                sent, sent if h ==0 else [], ax=axs[h])
+#        plt.show()
+#        plt.savefig('encoderlayer_' + num + ' .svg')
+#
+#    for layer in range(1, 6, 2):
+#        num = str(layer+1)
+#        fig, axs = plt.subplots(1,4, figsize=(20, 10))
+#        print("Decoder Self Layer", layer+1)
+#        for h in range(4):
+#            draw(model.decoder.layers[layer].self_attn.attn[0, h].data[:len(tgt_sent), :len(tgt_sent)], 
+#                tgt_sent, tgt_sent if h ==0 else [], ax=axs[h])
+#        plt.show()
+#        plt.savefig('DecoderSelfLayer_' + num + ' .svg')
+#    print("Decoder Src Layer", layer+1)
+#    fig, axs = plt.subplots(1,4, figsize=(20, 10))
+#    for h in range(4):
+#        draw(model.decoder.layers[layer].src_attn.attn[0, h].data[:len(tgt_sent), :len(sent)], 
+#            sent, tgt_sent if h ==0 else [], ax=axs[h])
+#    plt.show()
+#    plt.savefig('DecoderSrcLayer_' + num + ' .svg')
+
     """Translate default sentence"""
     print("Source:")
-    print("Le cheval est grand .")
-    sent = """Le cheval est grand .""".split()  
+    print(testSentence)
+    sent = testSentence.split()  
     src = torch.LongTensor([[SRC.vocab.stoi[w] for w in sent]])
     src = Variable(src).cuda()
     src_mask = (src != SRC.vocab.stoi["<blank>"]).unsqueeze(-2)
@@ -252,7 +342,7 @@ def evaluate(model, valid_iter, criterion, device, optimizer, pad_idx, validItNb
         trans += sym + " "
     print(trans.encode("utf-8"))                   
     print("Target :")
-    print("The horse is big .")
+    print(testTranslation)
     
     print("Plotting and exporting graphs")
     
@@ -262,7 +352,7 @@ def evaluate(model, valid_iter, criterion, device, optimizer, pad_idx, validItNb
     
     for layer in range(1, 6, 2):
         num = str(layer+1)
-        fig, axs = plt.subplots(1,4, figsize=(20, 10))
+        fig, axs = plt.subplots(1,4, figsize=(40, 20))
         print("Encoder Layer", layer+1)
         for h in range(4):
             draw(model.encoder.layers[layer].self_attn.attn[0, h].data[:len(sent), :len(sent)], 
@@ -272,7 +362,7 @@ def evaluate(model, valid_iter, criterion, device, optimizer, pad_idx, validItNb
 
     for layer in range(1, 6, 2):
         num = str(layer+1)
-        fig, axs = plt.subplots(1,4, figsize=(20, 10))
+        fig, axs = plt.subplots(1,4, figsize=(40, 20))
         print("Decoder Self Layer", layer+1)
         for h in range(4):
             draw(model.decoder.layers[layer].self_attn.attn[0, h].data[:len(tgt_sent), :len(tgt_sent)], 
@@ -280,14 +370,12 @@ def evaluate(model, valid_iter, criterion, device, optimizer, pad_idx, validItNb
         plt.show()
         plt.savefig('DecoderSelfLayer_' + num + ' .svg')
     print("Decoder Src Layer", layer+1)
-    fig, axs = plt.subplots(1,4, figsize=(20, 10))
+    fig, axs = plt.subplots(1,4, figsize=(40, 20))
     for h in range(4):
         draw(model.decoder.layers[layer].src_attn.attn[0, h].data[:len(tgt_sent), :len(sent)], 
             sent, tgt_sent if h ==0 else [], ax=axs[h])
     plt.show()
     plt.savefig('DecoderSrcLayer_' + num + ' .svg')
-
-    
 
 """**Run training/Evaluate**""" 
 

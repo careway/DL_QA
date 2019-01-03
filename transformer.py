@@ -264,6 +264,7 @@ def run_epoch(data_iter, model, loss_compute, maxItNb):
     "Standard Training and Logging Function"
     total_tokens = 0
     total_loss = 0
+    lossArray = [] 
     for i, batch in enumerate(data_iter):
         out = model.forward(batch.src, batch.trg, 
                             batch.src_mask, batch.trg_mask)
@@ -271,10 +272,11 @@ def run_epoch(data_iter, model, loss_compute, maxItNb):
         total_loss += loss
         total_tokens += batch.ntokens.float()
         print('\nEpoch ', i, 'loss ', loss/batch.ntokens.float())
+        lossArray.append(loss/batch.ntokens.float())
         if i >= maxItNb : 
             break
-        torch.cuda.empty_cache()
-    return total_loss / total_tokens
+    tot = total_loss / total_tokens
+    return tot, lossArray
 
 global max_src_in_batch, max_tgt_in_batch
 
@@ -317,6 +319,8 @@ class NoamOpt:
         return self.factor * (self.model_size ** (-0.5) * min(step ** (-0.5), step * self.warmup ** (-1.5)))
 
 
+def get_std_opt(model):
+    return NoamOpt(model.src_embed[0].d_model, 2, 4000, torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
 
 def loadModel(path, SRC, TGT, device):
     state = torch.load(path, map_location=device)

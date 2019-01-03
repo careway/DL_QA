@@ -1,9 +1,9 @@
 This our implementation of a transformer based text translator, as described in Attention is all you need by Vaswani et al.
 
-transformer.py : contains everything to create a transformer network
-training.py : contains the methods for training the network and testing a pre-trained model
-dataLoaderIWLST.py : contains the method for loading the IWLST database
-python_job.sh : run file
+- transformer.py : contains everything to create a transformer network
+- training.py : contains the methods for training the network and testing a pre-trained model
+- dataLoaderIWLST.py : contains the method for loading the IWLST database
+- python_job.sh : run file
 
 To get started open the transformer.py file in your IDE, and tweak the parameters at the top of the file to your liking :
 - justEvaluate : if true, this will load the pre trained model at "modelSavePath" and eavluate it only

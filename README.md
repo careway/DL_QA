@@ -18,3 +18,6 @@ testSentence : custom test sentence for evaluation.
 testTranslation : target translation for the above mentionned custom translation
 
 Once this is done, simply run python_job.sh in your linux terminal
+
+
+Alternatively, if you have enough memory, you can run everything from the notebook TranslationFREN.ipynb
